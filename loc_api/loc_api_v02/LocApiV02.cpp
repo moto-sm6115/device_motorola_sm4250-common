@@ -309,12 +309,13 @@ LocApiV02 :: LocApiV02(LOC_API_ADAPTER_EVENT_MASK_T exMask,
     mGnssMeasurements(nullptr),
     mBatchSize(0), mDesiredBatchSize(0),
     mTripBatchSize(0), mDesiredTripBatchSize(0),
-    mSvMeasurementSet(nullptr),
     mIsFirstFinalFixReported(false),
     mIsFirstStartFixReq(false),
     mHlosQtimer1(0),
     mHlosQtimer2(0),
-    mRefFCount(0)
+    mRefFCount(0),
+    mMeasElapsedRealTimeCal(600000000),
+    mPositionElapsedRealTimeCal(30000000)
 {
   // initialize loc_sync_req interface
   loc_sync_req_init();
@@ -3200,18 +3201,39 @@ void LocApiV02 :: reportPosition (
                     location_report_ptr->dgnssDataAgeMsec;
         }
 
+        int64_t elapsedRealTime = -1;
+        int64_t unc = -1;
         if (location_report_ptr->systemTick_valid &&
             location_report_ptr->systemTickUnc_valid) {
+            LOC_LOGD("Report position to the upper layer");
             /* deal with Qtimer for ElapsedRealTimeNanos */
-            location.gpsLocation.flags |= LOC_GPS_LOCATION_HAS_ELAPSED_REAL_TIME;
-            location.gpsLocation.elapsedRealTime = location_report_ptr->systemTick;
+            elapsedRealTime = ElapsedRealtimeEstimator::getElapsedRealtimeQtimer(
+                    location_report_ptr->systemTick);
 
             /* Uncertainty on HLOS time is 0, so the uncertainty of the difference
                is the uncertainty of the Qtimer in the modem
                Note that location_report_ptr->systemTickUnc is in msec */
-            location.gpsLocation.elapsedRealTimeUnc =
-                    location_report_ptr->systemTickUnc * 1000000;
+            unc = (int64_t)location_report_ptr->systemTickUnc * 1000000;
+        } else if (location_report_ptr->timestampUtc_valid == 1) {
+            //If Qtimer isn't valid, estimate the elapsedRealTime
+            int64_t locationTimeNanos = (int64_t)(location_report_ptr->timestampUtc) * 1000000;
+            bool isCurDataTimeTrustable =
+                    (locationTimeNanos % ((int64_t)mMinInterval * 1000000) == 0);
+            elapsedRealTime = mPositionElapsedRealTimeCal.
+                    getElapsedRealtimeEstimateNanos(locationTimeNanos, isCurDataTimeTrustable,
+                                                    (int64_t)mMinInterval * 1000000);
+            unc = mPositionElapsedRealTimeCal.getElapsedRealtimeUncNanos();
         }
+
+        if (elapsedRealTime != -1) {
+            location.gpsLocation.flags |= LOC_GPS_LOCATION_HAS_ELAPSED_REAL_TIME;
+            location.gpsLocation.elapsedRealTime = elapsedRealTime;
+            location.gpsLocation.elapsedRealTimeUnc = unc;
+        }
+
+        LOC_LOGd("Position elapsedRealtime: %" PRIi64 " uncertainty: %" PRIi64 "",
+               location.gpsLocation.elapsedRealTime,
+               location.gpsLocation.elapsedRealTimeUnc);
 
         LOC_LOGv("report position mask: 0x%" PRIx64 ", dgnss info: 0x%x %d %d %d %d,",
                  locationExtended.flags,
@@ -5142,23 +5164,49 @@ void LocApiV02::reportGnssMeasurementData(
 
     if (gnss_measurement_report_ptr.maxMessageNum == gnss_measurement_report_ptr.seqNum &&
         maxSubSeqNum == subSeqNum) {
-        LOC_LOGv("Report the measurements to the upper layer");
+        LOC_LOGD("Report the measurements to the upper layer");
+        int64_t elapsedRealTime = -1;
+        int64_t unc;
         if (gnss_measurement_report_ptr.refCountTicks_valid &&
             gnss_measurement_report_ptr.refCountTicksUnc_valid) {
             /* deal with Qtimer for ElapsedRealTimeNanos */
-
             mGnssMeasurements->gnssMeasNotification.clock.flags |=
                     GNSS_MEASUREMENTS_CLOCK_FLAGS_ELAPSED_REAL_TIME_BIT;
 
-            mGnssMeasurements->gnssMeasNotification.clock.elapsedRealTime =
-                    gnss_measurement_report_ptr.refCountTicks;
+            elapsedRealTime = ElapsedRealtimeEstimator::getElapsedRealtimeQtimer(
+                    gnss_measurement_report_ptr.refCountTicks);
 
             /* Uncertainty on HLOS time is 0, so the uncertainty of the difference
             is the uncertainty of the Qtimer in the modem
             Note that gnss_measurement_report_ptr.refCountTicksUncis in msec */
-             mGnssMeasurements->gnssMeasNotification.clock.elapsedRealTimeUnc =
-                    gnss_measurement_report_ptr.refCountTicksUnc * 1000000;
+            unc = gnss_measurement_report_ptr.refCountTicksUnc * 1000000;
+        } else {
+            //If Qtimer isn't valid, estimate the elapsedRealTime
+            GnssMeasurementsNotification& in = mGnssMeasurements->gnssMeasNotification;
+            const uint32_t UTC_TO_GPS_SECONDS = 315964800;
+            int64_t measTimeNanos = (int64_t)in.clock.timeNs - (int64_t)in.clock.fullBiasNs
+                    - (int64_t)in.clock.biasNs - (int64_t)in.clock.leapSecond * 1000000000
+                    + (int64_t)UTC_TO_GPS_SECONDS * 1000000000;
+            bool isCurDataTimeTrustable =
+                    in.clock.flags & GNSS_MEASUREMENTS_CLOCK_FLAGS_LEAP_SECOND_BIT &&
+                    in.clock.flags & GNSS_MEASUREMENTS_CLOCK_FLAGS_FULL_BIAS_BIT &&
+                    in.clock.flags & GNSS_MEASUREMENTS_CLOCK_FLAGS_BIAS_BIT &&
+                    in.clock.flags & GNSS_MEASUREMENTS_CLOCK_FLAGS_BIAS_UNCERTAINTY_BIT;
+            elapsedRealTime = mMeasElapsedRealTimeCal.
+                    getElapsedRealtimeEstimateNanos(measTimeNanos, isCurDataTimeTrustable, 0);
+            unc = mMeasElapsedRealTimeCal.getElapsedRealtimeUncNanos();
         }
+
+        if (elapsedRealTime != -1) {
+            mGnssMeasurements->gnssMeasNotification.clock.flags |=
+                    GNSS_MEASUREMENTS_CLOCK_FLAGS_ELAPSED_REAL_TIME_BIT;
+            mGnssMeasurements->gnssMeasNotification.clock.elapsedRealTime = elapsedRealTime;
+            mGnssMeasurements->gnssMeasNotification.clock.elapsedRealTimeUnc = unc;
+        }
+        LOC_LOGd("Measurement elapsedRealtime: %" PRIi64 " uncertainty: %" PRIi64 "",
+               mGnssMeasurements->gnssMeasNotification.clock.elapsedRealTime,
+               mGnssMeasurements->gnssMeasNotification.clock.elapsedRealTimeUnc);
+
         reportSvMeasurementInternal();
         resetSvMeasurementReport();
         // set up flag to indicate that no new info in mGnssMeasurements
@@ -5639,6 +5687,42 @@ void LocApiV02::convertGnssMeasurementsHeader(const Gnss_LocSvSystemEnumType loc
                     gnss_measurement_info.BdsB1iB1cTimeBias.timeBiasUnc * 1000000;
             mTimeBiases.flags |= BIAS_BDSB1_BDSB1C_UNC_VALID;
         }
+    }
+
+    if (1 == gnss_measurement_info.GpsL1L2cTimeBias_valid) {
+        qmiLocInterSystemBiasStructT_v02* interSystemBias =
+                (qmiLocInterSystemBiasStructT_v02*)&gnss_measurement_info.GpsL1L2cTimeBias;
+
+        getInterSystemTimeBias("gpsL1L2cTimeBias",
+                               svMeasSetHead.gpsL1L2cTimeBias, interSystemBias);
+        svMeasSetHead.flags |= GNSS_SV_MEAS_HEADER_HAS_GPSL1L2C_TIME_BIAS;
+    }
+
+    if (1 == gnss_measurement_info.GloG1G2TimeBias_valid) {
+        qmiLocInterSystemBiasStructT_v02* interSystemBias =
+                (qmiLocInterSystemBiasStructT_v02*)&gnss_measurement_info.GloG1G2TimeBias;
+
+        getInterSystemTimeBias("gloG1G2TimeBias",
+                               svMeasSetHead.gloG1G2TimeBias, interSystemBias);
+        svMeasSetHead.flags |= GNSS_SV_MEAS_HEADER_HAS_GLOG1G2_TIME_BIAS;
+    }
+
+    if (1 == gnss_measurement_info.BdsB1iB1cTimeBias_valid) {
+        qmiLocInterSystemBiasStructT_v02* interSystemBias =
+                (qmiLocInterSystemBiasStructT_v02*)&gnss_measurement_info.BdsB1iB1cTimeBias;
+
+        getInterSystemTimeBias("bdsB1iB1cTimeBias",
+                               svMeasSetHead.bdsB1iB1cTimeBias, interSystemBias);
+        svMeasSetHead.flags |= GNSS_SV_MEAS_HEADER_HAS_BDSB1IB1C_TIME_BIAS;
+    }
+
+    if (1 == gnss_measurement_info.GalE1E5bTimeBias_valid) {
+        qmiLocInterSystemBiasStructT_v02* interSystemBias =
+                (qmiLocInterSystemBiasStructT_v02*)&gnss_measurement_info.GalE1E5bTimeBias;
+
+        getInterSystemTimeBias("galE1E5bTimeBias",
+                               svMeasSetHead.galE1E5bTimeBias, interSystemBias);
+        svMeasSetHead.flags |= GNSS_SV_MEAS_HEADER_HAS_GALE1E5B_TIME_BIAS;
     }
 
     if (1 == gnss_measurement_info.gloTime_valid) {
@@ -9472,6 +9556,11 @@ LocApiV02::startTimeBasedTracking(const TrackingOptions& options, LocApiResponse
     LOC_LOGD("%s] minInterval %u", __func__, options.minInterval);
     LocationError err = LOCATION_ERROR_SUCCESS;
 
+    if (!mInSession) {
+        mPositionElapsedRealTimeCal.reset();
+        mMeasElapsedRealTimeCal.reset();
+    }
+
     mInSession = true;
     mMeasurementsStarted = true;
     registerEventMask(mMask);
@@ -9486,6 +9575,7 @@ LocApiV02::startTimeBasedTracking(const TrackingOptions& options, LocApiResponse
 
     // interval
     uint32_t minInterval = options.minInterval;
+    mMinInterval = minInterval;
 
     /*set interval for intermediate fixes*/
     start_msg.minIntermediatePositionReportInterval_valid = 1;
