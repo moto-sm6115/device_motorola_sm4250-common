@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017-2020 The LineageOS Project
+# Copyright (C) 2017-2021 The LineageOS Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ BUILD_BROKEN_DUP_RULES := true
 
 BOARD_VENDOR := motorola
 
-VENDOR_PATH := device/motorola/sm6150-common
+VENDOR_PATH := device/motorola/sm4250-common
 
 # Architecture
 TARGET_ARCH := arm64
@@ -41,7 +41,7 @@ ENABLE_CPUSETS := true
 ENABLE_SCHEDBOOST := true
 
 # Bootloader
-TARGET_BOOTLOADER_BOARD_NAME := sm6150
+TARGET_BOOTLOADER_BOARD_NAME := bengal
 TARGET_NO_BOOTLOADER := true
 TARGET_USES_UEFI := true
 
@@ -54,7 +54,7 @@ BOARD_KERNEL_PAGESIZE := 4096
 BOARD_KERNEL_SEPARATED_DTBO := true
 BOARD_MKBOOTIMG_ARGS += --header_version $(BOARD_BOOT_HEADER_VERSION)
 TARGET_KERNEL_ARCH := arm64
-TARGET_KERNEL_SOURCE := kernel/motorola/sm6150
+TARGET_KERNEL_SOURCE := kernel/motorola/sm4250
 TARGET_KERNEL_CLANG_COMPILE := true
 
 # Kernel modules - Audio
@@ -96,9 +96,9 @@ TARGET_MODULE_ALIASES += \
 
 # Platform
 BOARD_USES_QCOM_HARDWARE := true
-QCOM_BOARD_PLATFORMS += sm6150
-TARGET_BOARD_PLATFORM := sm6150
-TARGET_BOARD_PLATFORM_GPU := qcom-adreno620
+QCOM_BOARD_PLATFORMS += bengal
+TARGET_BOARD_PLATFORM := bengal
+TARGET_BOARD_PLATFORM_GPU := qcom-adreno610
 TARGET_USES_QCOM_BSP := true
 
 # APEX
@@ -173,8 +173,8 @@ DEVICE_MATRIX_FILE := $(VENDOR_PATH)/compatibility_matrix.xml
 DEVICE_MANIFEST_FILE := $(VENDOR_PATH)/manifest.xml
 
 # Init
-TARGET_INIT_VENDOR_LIB := //$(VENDOR_PATH):libinit_sm6150
-TARGET_RECOVERY_DEVICE_MODULES := libinit_sm6150
+TARGET_INIT_VENDOR_LIB := //$(VENDOR_PATH):libinit_bengal
+TARGET_RECOVERY_DEVICE_MODULES := libinit_bengal
 
 # Partitions
 BOARD_BOOTIMAGE_PARTITION_SIZE := 67108864
