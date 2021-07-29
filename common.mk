@@ -153,8 +153,8 @@ PRODUCT_PACKAGES += \
     android.hardware.boot@1.0-impl:64 \
     android.hardware.boot@1.0-service \
     android.hardware.boot@1.0-impl.recovery \
-    bootctrl.qcom \
-    bootctrl.qcom.recovery
+    bootctrl.bengal \
+    bootctrl.bengal.recovery
 
 PRODUCT_PACKAGES_DEBUG += \
     bootctl
