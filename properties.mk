@@ -148,6 +148,10 @@ PRODUCT_PROPERTY_OVERRIDES += \
 PRODUCT_PROPERTY_OVERRIDES += \
     drm.service.enabled=true
 
+# Enable USB debugging by default for bringup
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.sys.usb.config=adb
+
 # FM
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.vendor.fm.use_audio_session=true
