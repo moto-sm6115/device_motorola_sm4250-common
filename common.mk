@@ -279,6 +279,8 @@ PRODUCT_PACKAGES += \
     libgeofencing \
     libgnss \
     libgnsspps \
+    libloc_core \
+    liblocation_api \
     libsynergy_loc_api
 
 PRODUCT_PACKAGES += \
