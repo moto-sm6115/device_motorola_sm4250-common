@@ -60,6 +60,10 @@ ifeq ($(filter %_foles %_parker,$(TARGET_PRODUCT)),)
 $(call inherit-product, device/motorola/sm4250-common/common_dynamic.mk)
 endif
 
+# Profiles
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/configs/task_profiles.json:$(TARGET_COPY_OUT_VENDOR)/etc/task_profiles.json
+
 # Properties
 -include $(LOCAL_PATH)/properties.mk
 
