@@ -33,7 +33,6 @@ PRODUCT_COPY_FILES += \
 # Overlays
 DEVICE_PACKAGE_OVERLAYS += \
     $(LOCAL_PATH)/overlay \
-    $(LOCAL_PATH)/overlay-lineage
 
 PRODUCT_ENFORCE_RRO_TARGETS := *
 PRODUCT_ENFORCE_RRO_EXCLUDED_OVERLAYS += \
@@ -46,9 +45,11 @@ AB_OTA_UPDATER := true
 AB_OTA_PARTITIONS += \
     boot \
     dtbo \
+    product \
+    recovery \
     system \
-    vendor \
-    vbmeta
+    vbmeta \
+    vendor
 
 AB_OTA_POSTINSTALL_CONFIG += \
     RUN_POSTINSTALL_system=true \
@@ -61,10 +62,6 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 PRODUCT_PACKAGES += \
     otapreopt_script
-
-ifeq ($(filter %_foles %_parker,$(TARGET_PRODUCT)),)
-$(call inherit-product, device/motorola/sm4250-common/common_dynamic.mk)
-endif
 
 # Profiles
 PRODUCT_COPY_FILES += \
@@ -197,6 +194,7 @@ PRODUCT_PACKAGES += \
 # Common init scripts
 PRODUCT_PACKAGES += \
     fstab.qcom \
+    fstab.postinstall \
     init.class_main.sh \
     init.crda.sh \
     init.mdm.sh \
@@ -222,6 +220,12 @@ PRODUCT_PACKAGES += \
     init.recovery.qcom.rc \
     init.target.rc \
     ueventd.qcom.rc
+
+# Crypto
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.crypto.dm_default_key.options_format.version=2 \
+    ro.crypto.volume.metadata.method=dm-default-key \
+    ro.crypto.volume.options=::v2
 
 # Cryptfshw
 PRODUCT_PACKAGES += \
@@ -261,6 +265,10 @@ PRODUCT_PACKAGES += \
     android.hardware.drm@1.3-service.clearkey \
     android.hardware.drm@1.3-service.widevine
 
+# Fastbootd
+PRODUCT_PACKAGES += \
+    fastbootd
+
 # FM
 PRODUCT_PACKAGES += \
     FM2 \
@@ -273,6 +281,19 @@ PRODUCT_BOOT_JARS += qcom.fmradio
 # For config.fs
 PRODUCT_PACKAGES += \
     fs_config_files
+
+# Fstab
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/rootdir/etc/fstab.qcom:$(TARGET_COPY_OUT_RAMDISK)/fstab.hardware \
+    $(LOCAL_PATH)/rootdir/etc/fstab.qcom:$(TARGET_COPY_OUT_RECOVERY)/root/first_stage_ramdisk/fstab.hardware \
+    $(LOCAL_PATH)/rootdir/etc/fstab.qcom:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/first_stage_ramdisk/fstab.hardware \
+    $(LOCAL_PATH)/rootdir/etc/fstab.qcom:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.hardware \
+
+PRODUCT_PRODUCT_PROPERTIES += \
+    ro.postinstall.fstab.prefix=/product
+
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/rootdir/etc/fstab.postinstall:$(TARGET_COPY_OUT_PRODUCT)/etc/fstab.postinstall
 
 # GPS
 PRODUCT_PACKAGES += \
