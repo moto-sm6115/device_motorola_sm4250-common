@@ -261,6 +261,10 @@ TARGET_RECOVERY_UI_LIB := \
     librecovery_ui \
     libfstab
 
+# Symlinks
+BOARD_ROOT_EXTRA_SYMLINKS := /vendor/lib/dsp:/dsp
+BOARD_ROOT_EXTRA_SYMLINKS += /mnt/vendor/persist:/persist
+
 # RIL
 ENABLE_VENDOR_RIL_SERVICE := true
 TARGET_RIL_VARIANT := caf
