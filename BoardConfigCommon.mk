@@ -14,10 +14,11 @@
 # limitations under the License.
 #
 
+# Legacy Rules
 BUILD_BROKEN_DUP_RULES := true
+BUILD_BROKEN_USES_BUILD_COPY_HEADERS := true
 
 BOARD_VENDOR := motorola
-
 VENDOR_PATH := device/motorola/sm4250-common
 
 # Architecture
